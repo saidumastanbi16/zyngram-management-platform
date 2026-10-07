@@ -1,0 +1,12 @@
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.dump
+*.bson
