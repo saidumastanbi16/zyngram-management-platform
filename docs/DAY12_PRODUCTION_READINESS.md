@@ -11,7 +11,8 @@
 - Database readiness: `/api/ready` returned HTTP 200 with `ready: true`, `storage: mongodb`, and `transactions: true`.
 - CORS: the health and readiness requests succeeded from the Netlify frontend origin.
 - Atlas: the guarded empty-state bootstrap initialized `zyngram_day10`; the one-time `MONGODB_BOOTSTRAP_EMPTY` flag was removed and Render redeployed successfully.
-- Admin sign-in and full registration/order workflows were not independently verified. No local JSON/demo records were imported.
+- Admin sign-in was verified after the guarded reset; full customer registration/order workflows were not tested against live data. Registration input validation and unknown-account login return the expected 400/401 responses. No local JSON/demo records were imported.
+- The live database has one customer and saved locations, but no franchises or geo-boundaries. Unmapped locations and the empty Point selector are therefore expected; configure the real Command → Hub → Center → Point hierarchy and approved polygons before expecting mapping or bookings.
 
 ## Local database and migration verification (2026-10-07)
 

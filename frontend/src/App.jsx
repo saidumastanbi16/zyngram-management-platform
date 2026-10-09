@@ -232,7 +232,7 @@ function App() {
           {page === "Dashboard" && <Dashboard users={users} franchises={franchises} orders={orders} commissions={commissions} hierarchy={hierarchy} metrics={dashboardData?.metrics} latestLocation={dashboardData?.latest_location} loading={loading} refresh={load}/>}
           {page === "Employees" && <EmployeeManagement session={session} notify={notify}/>}
           {page === "Customers" && <Customers users={users} setUsers={setUsers} notify={notify} isAdmin={isAdmin}/>}
-          {page === "Locations" && isAdmin && <Locations users={users} franchises={franchises} notify={notify}/>}
+          {page === "Locations" && isAdmin && <Locations users={users} franchises={franchises} notify={notify} onManageFranchises={() => setPage("Franchises")}/>}
           {page === "Franchises" && ["ADMIN", "HQ"].includes(session.role) && <Franchises franchises={franchises} boundaries={boundaries} setFranchises={setFranchises} refresh={load} notify={notify}/>}
           {page === "Orders" && <Orders orders={orders} users={users} refresh={load} notify={notify} onManageLocations={() => setPage("Locations")}/>}
           {page === "Mobile Recharge" && <Orders orders={orders} users={users} refresh={load} notify={notify} onManageLocations={() => setPage("Locations")} serviceFilter={MOBILE_RECHARGE_SERVICE_ID}/>}
@@ -614,7 +614,7 @@ function CustomerPortal({ user, notify }) {
     <section className="customer-welcome"><div><span className="eyebrow"><span/> YOUR CUSTOMER SPACE</span><h2>Hello, {user.name.split(" ")[0]}.</h2><p>Your account is ready. Save a service location to get started.</p></div><div className="customer-avatar">{user.name.charAt(0).toUpperCase()}</div></section>
     <div className="customer-grid">
       <section className="card customer-profile"><span className="customer-card-icon">◎</span><span className="customer-card-kicker">YOUR PROFILE</span><h3>Account details</h3><div className="profile-detail"><span>Full name</span><strong>{user.name}</strong></div><div className="profile-detail"><span>Email address</span><strong>{user.email}</strong></div><div className="profile-detail"><span>Account type</span><strong>Customer</strong></div><span className="account-status"><i/> Account active</span></section>
-      <section className="card customer-location"><span className="customer-card-icon">⌖</span><span className="customer-card-kicker">SERVICE LOCATION</span><h3>Save a location</h3><p>Share your device location to find the franchise that serves you. Your coordinates are only saved when you choose to share them.</p><div className="customer-location-buttons"><button className="primary-btn" onClick={capture} disabled={busy}>{busy ? "Detecting and mapping…" : "Use my current location"}</button><button className="secondary-btn" onClick={useDemoLocation} disabled={busy}>Use configured demo location</button></div><small className="privacy-note">The demo option uses a clearly labelled Visakhapatnam test coordinate inside the sample franchise boundary.</small></section>
+      <section className="card customer-location"><span className="customer-card-icon">⌖</span><span className="customer-card-kicker">SERVICE LOCATION</span><h3>Save a location</h3><p>Share your device location to find the franchise that serves you. Your coordinates are only saved when you choose to share them.</p><div className="customer-location-buttons"><button className="primary-btn" onClick={capture} disabled={busy}>{busy ? "Detecting and mapping…" : "Use my current location"}</button><button className="secondary-btn" onClick={useDemoLocation} disabled={busy}>Use demo test location</button></div><small className="privacy-note">This uses a Visakhapatnam test coordinate. It will remain unmapped until an administrator configures an active franchise boundary for that area.</small></section>
     </div>
     <section className="card live-tracking-card">
       <Header title="Live location" sub="Turn tracking on to see your device move. Your live trail stays in this browser and is not saved automatically." badge={tracking ? "TRACKING" : "OFF"}/>
@@ -767,14 +767,96 @@ function Customers({users,setUsers,notify,isAdmin=true}) {
   return <div className="content"><section className="card"><Header title="Customer Management" sub="Search customer accounts, edit profiles, and manage account status"/><div className="toolbar"><input aria-label="Search customers" placeholder="Search name, email, mobile or ID" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Filter customers by status" value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>{isAdmin&&<button className="primary-btn" onClick={()=>setOpen(true)}>+ Add Customer</button>}</div><Table headers={["ID","Name","Mobile","Email","Status","Details","Actions"]} rows={customers.map(x=>[x.id,x.name,x.mobile,x.email,<span className={`badge ${x.status==="ACTIVE"?"success":"muted"}`}>{x.status||"ACTIVE"}</span>,<button className="secondary-btn" onClick={()=>setSelected({...x})}>{isAdmin?"View / edit":"View profile"}</button>,isAdmin?<button className="secondary-btn" onClick={()=>toggleStatus(x)}>{x.status==="INACTIVE"?"Activate":"Deactivate"}</button>:"—"])} empty="No customers match these filters"/></section>{selected&&<Modal title={isAdmin?"Edit customer profile":"Customer profile"} close={()=>setSelected(null)}>{isAdmin?<form onSubmit={saveSelected}><Field label="Name" value={selected.name} set={value=>setSelected({...selected,name:value})}/><Field label="Email" type="email" value={selected.email} set={value=>setSelected({...selected,email:value})}/><Field label="Mobile" value={selected.mobile} set={value=>setSelected({...selected,mobile:value})}/><div className="snapshot-info"><div><span>Account ID</span><b>{selected.id}</b></div><div><span>Status</span><b>{selected.status||"ACTIVE"}</b></div><div><span>Registered</span><b>{dateText(selected.created_at)}</b></div></div><button className="primary-btn" disabled={busy}>{busy?"Saving…":"Save profile"}</button></form>:<div className="snapshot-info"><div><span>Name</span><b>{selected.name}</b></div><div><span>Email</span><b>{selected.email}</b></div><div><span>Mobile</span><b>{selected.mobile}</b></div><div><span>Account ID</span><b>{selected.id}</b></div><div><span>Status</span><b>{selected.status||"ACTIVE"}</b></div><div><span>Registered</span><b>{dateText(selected.created_at)}</b></div></div>}</Modal>}{open&&<Modal title="Register Customer" close={()=>setOpen(false)}><form onSubmit={submit}><Field label="Name" value={form.name} set={v=>setForm({...form,name:v})}/><Field label="Mobile" value={form.mobile} set={v=>setForm({...form,mobile:v})}/><Field label="Email" value={form.email} set={v=>setForm({...form,email:v})} type="email"/><button className="primary-btn" disabled={busy}>{busy?"Saving...":"Create Customer"}</button></form></Modal>}</div>;
 }
 
-function Locations({users,franchises,notify}) {
-  const [userId,setUserId]=useState(""),[pos,setPos]=useState({lat:17.6868,lon:83.2185,accuracy:10}),[busy,setBusy]=useState(false),[mapping,setMapping]=useState(null),[allLocations,setAllLocations]=useState([]),[correction,setCorrection]=useState({location_id:"",point_id:"",reason:""});
-  useEffect(()=>{let active=true;Promise.allSettled(users.map(user=>api(`/api/locations/user/${encodeURIComponent(user.id)}`))).then(results=>{if(active){const failures=results.filter(result=>result.status==="rejected");if(failures.length)notify(`${failures.length} customer location list(s) could not be loaded: ${failures.map(result=>result.reason.message).join("; ")}`,"warning");const saved=results.flatMap(result=>result.status==="fulfilled"?result.value.locations||[]:[]);setAllLocations(saved);setCorrection(current=>({...current,location_id:current.location_id||saved[0]?.id||""}))}});return()=>{active=false}},[users,notify]);
-  const gps=()=>{if(!navigator.geolocation)return notify("Geolocation is not supported","error");setBusy(true);navigator.geolocation.getCurrentPosition(p=>{setPos({lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy});setBusy(false);notify("Browser location captured")},()=>{setBusy(false);notify("Location permission denied or unavailable","error")},{enableHighAccuracy:true,timeout:10000,maximumAge:0})};
-  const save=async()=>{try{setBusy(true);const result=await api("/api/locations/capture",{method:"POST",body:JSON.stringify({user_id:userId,lat:pos.lat,lon:pos.lon,accuracy:pos.accuracy,source:"browser"})});setAllLocations(items=>[result.location,...items]);notify("Location saved")}catch(e){notify(e.message,"error")}finally{setBusy(false)}};
-  const map=async()=>{try{setBusy(true);const d=await api("/api/geo-mapping/map",{method:"POST",body:JSON.stringify({lat:pos.lat,lon:pos.lon})});setMapping(d.mapping);notify(d.mapping?.status||"Mapping checked")}catch(e){setMapping({status:"UNMAPPED"});notify(e.message,"error")}finally{setBusy(false)}};
-  const correct=async event=>{event.preventDefault();setBusy(true);try{const result=await api("/api/geo/mapping-corrections",{method:"POST",body:JSON.stringify(correction)});setMapping(result.mapping);notify("Mapping correction saved with audit reason")}catch(error){notify(error.message,"error")}finally{setBusy(false)}};
-  return <div className="content"><section className="card"><Header title="Location Capture & Geo Mapping" sub="GPS, accuracy and polygon boundary lookup"/><div className="form-grid"><div><label>Customer</label><select value={userId} onChange={e=>setUserId(e.target.value)}><option value="">Select a customer</option>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div><Field label="Latitude" value={pos.lat} set={v=>setPos({...pos,lat:Number(v)})}/><Field label="Longitude" value={pos.lon} set={v=>setPos({...pos,lon:Number(v)})}/><Field label="Accuracy (m)" value={pos.accuracy} set={v=>setPos({...pos,accuracy:Number(v)})}/></div><div className="button-row"><button className="primary-btn" onClick={gps} disabled={busy}>Capture Browser GPS</button><button className="secondary-btn" onClick={save} disabled={busy||!userId}>Save Location</button><button className="secondary-btn" onClick={map} disabled={busy}>Map to Franchise</button></div><Map lat={pos.lat} lon={pos.lon} mapped={mapping?.status==="MAPPED"} boundaryGeometry={mapping?.boundary_geometry} boundaryId={mapping?.boundary_id}/>  <div className="snapshot-info"><div><span>Accuracy</span><b>{pos.accuracy} m</b></div><div><span>Mapping</span><b>{mapping?.status||"Not checked"}</b></div><div><span>Source</span><b>Browser / Test</b></div></div>{mapping?.status==="MAPPED"&&<div className="mapping-result">{["point","center","hub","command","node","zone","territory","region","nation"].filter(k=>mapping[k]).map(k=><div key={k}><span>{k}</span><b>{mapping[k].name}</b></div>)}</div>}</section><section className="card"><Header title="Saved customer locations" sub={`${allLocations.length} saved locations`}/><Table headers={["Customer","Location","Accuracy","Captured"]} rows={allLocations.map(location=>[users.find(user=>user.id===location.user_id)?.name||location.user_id,location.id,`${location.accuracy} m`,dateText(location.captured_at)])} empty="No saved customer locations"/></section><section className="card"><Header title="Correct a franchise mapping" sub="Administrator corrections are versioned and recorded in the audit log"/><form className="staff-form" onSubmit={correct}><div className="form-grid"><div><label>Saved location</label><select required value={correction.location_id} onChange={e=>setCorrection({...correction,location_id:e.target.value})}><option value="">Select location</option>{allLocations.map(location=><option key={location.id} value={location.id}>{users.find(user=>user.id===location.user_id)?.name||location.user_id} · {location.id}</option>)}</select></div><div><label>Correct Point franchise</label><select required value={correction.point_id} onChange={e=>setCorrection({...correction,point_id:e.target.value})}><option value="">Select Point</option>{franchises.filter(item=>item.level==="Point"&&item.status==="ACTIVE").map(item=><option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select></div><Field label="Reason (10–500 characters)" value={correction.reason} set={value=>setCorrection({...correction,reason:value})}/></div><button className="primary-btn" disabled={busy}>{busy?"Saving…":"Save audited correction"}</button></form></section></div>;
+function Locations({users,franchises,notify,onManageFranchises}) {
+  const [userId,setUserId]=useState("");
+  const [pos,setPos]=useState({lat:17.6868,lon:83.2185,accuracy:10});
+  const [busy,setBusy]=useState(false);
+  const [mapping,setMapping]=useState(null);
+  const [allLocations,setAllLocations]=useState([]);
+  const [correction,setCorrection]=useState({location_id:"",point_id:"",reason:""});
+  const activePoints=franchises.filter(item=>item.level==="Point"&&item.status==="ACTIVE");
+
+  useEffect(()=>{
+    let active=true;
+    Promise.allSettled(users.map(user=>api(`/api/locations/user/${encodeURIComponent(user.id)}`))).then(results=>{
+      if(active){
+        const failures=results.filter(result=>result.status==="rejected");
+        if(failures.length)notify(`${failures.length} customer location list(s) could not be loaded: ${failures.map(result=>result.reason.message).join("; ")}`,"warning");
+        const saved=results.flatMap(result=>result.status==="fulfilled"?result.value.locations||[]:[]);
+        setAllLocations(saved);
+        setCorrection(current=>({...current,location_id:current.location_id||saved[0]?.id||""}));
+      }
+    });
+    return()=>{active=false};
+  },[users,notify]);
+
+  const gps=()=>{
+    if(!navigator.geolocation)return notify("Geolocation is not supported","error");
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      position=>{setPos({lat:position.coords.latitude,lon:position.coords.longitude,accuracy:position.coords.accuracy});setBusy(false);notify("Browser location captured");},
+      ()=>{setBusy(false);notify("Location permission denied or unavailable","error");},
+      {enableHighAccuracy:true,timeout:10000,maximumAge:0}
+    );
+  };
+  const save=async()=>{
+    try{
+      setBusy(true);
+      const result=await api("/api/locations/capture",{method:"POST",body:JSON.stringify({user_id:userId,lat:pos.lat,lon:pos.lon,accuracy:pos.accuracy,source:"browser"})});
+      setAllLocations(items=>[result.location,...items]);
+      notify("Location saved");
+    }catch(error){notify(error.message,"error");}
+    finally{setBusy(false);}
+  };
+  const map=async()=>{
+    try{
+      setBusy(true);
+      const result=await api("/api/geo-mapping/map",{method:"POST",body:JSON.stringify({lat:pos.lat,lon:pos.lon})});
+      setMapping(result.mapping);
+      notify(result.mapping?.status||"Mapping checked");
+    }catch(error){setMapping({status:"UNMAPPED"});notify(error.message,"error");}
+    finally{setBusy(false);}
+  };
+  const correct=async event=>{
+    event.preventDefault();
+    if(!activePoints.length)return;
+    setBusy(true);
+    try{
+      const result=await api("/api/geo/mapping-corrections",{method:"POST",body:JSON.stringify(correction)});
+      setMapping(result.mapping);
+      notify("Mapping correction saved with audit reason");
+    }catch(error){notify(error.message,"error");}
+    finally{setBusy(false);}
+  };
+
+  return <div className="content">
+    <section className="card">
+      <Header title="Location Capture & Geo Mapping" sub="GPS, accuracy and polygon boundary lookup"/>
+      <div className="form-grid">
+        <div><label>Customer</label><select value={userId} onChange={event=>setUserId(event.target.value)}><option value="">Select a customer</option>{users.map(user=><option key={user.id} value={user.id}>{user.name}</option>)}</select></div>
+        <Field label="Latitude" value={pos.lat} set={value=>setPos({...pos,lat:Number(value)})}/>
+        <Field label="Longitude" value={pos.lon} set={value=>setPos({...pos,lon:Number(value)})}/>
+        <Field label="Accuracy (m)" value={pos.accuracy} set={value=>setPos({...pos,accuracy:Number(value)})}/>
+      </div>
+      <div className="button-row"><button className="primary-btn" onClick={gps} disabled={busy}>Capture Browser GPS</button><button className="secondary-btn" onClick={save} disabled={busy||!userId}>Save Location</button><button className="secondary-btn" onClick={map} disabled={busy}>Map to Franchise</button></div>
+      <Map lat={pos.lat} lon={pos.lon} mapped={mapping?.status==="MAPPED"} boundaryGeometry={mapping?.boundary_geometry} boundaryId={mapping?.boundary_id}/>
+      <div className="snapshot-info"><div><span>Accuracy</span><b>{pos.accuracy} m</b></div><div><span>Mapping</span><b>{mapping?.status||"Not checked"}</b></div><div><span>Source</span><b>Browser / Test</b></div></div>
+      {mapping?.status==="MAPPED"&&<div className="mapping-result">{["point","center","hub","command","node","zone","territory","region","nation"].filter(key=>mapping[key]).map(key=><div key={key}><span>{key}</span><b>{mapping[key].name}</b></div>)}</div>}
+    </section>
+    <section className="card"><Header title="Saved customer locations" sub={`${allLocations.length} saved locations`}/><Table headers={["Customer","Location","Accuracy","Captured"]} rows={allLocations.map(location=>[users.find(user=>user.id===location.user_id)?.name||location.user_id,location.id,`${location.accuracy} m`,dateText(location.captured_at)])} empty="No saved customer locations"/></section>
+    <section className="card">
+      <Header title="Correct a franchise mapping" sub="Administrator corrections are versioned and recorded in the audit log"/>
+      {!activePoints.length&&<div className="booking-hint" role="status">No active Point franchises are configured, so a saved location cannot be corrected to a franchise yet. Configure the Command → Hub → Center → Point hierarchy and the Point’s real service-area boundary first. <button type="button" className="inline-auth-link" onClick={onManageFranchises}>Open Franchise Setup</button></div>}
+      <form className="staff-form" onSubmit={correct}>
+        <div className="form-grid">
+          <div><label>Saved location</label><select required value={correction.location_id} onChange={event=>setCorrection({...correction,location_id:event.target.value})}><option value="">Select location</option>{allLocations.map(location=><option key={location.id} value={location.id}>{users.find(user=>user.id===location.user_id)?.name||location.user_id} · {location.id}</option>)}</select></div>
+          <div><label>Correct Point franchise</label><select required value={correction.point_id} onChange={event=>setCorrection({...correction,point_id:event.target.value})}><option value="">Select Point</option>{activePoints.map(item=><option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select></div>
+          <Field label="Reason (10–500 characters)" value={correction.reason} set={value=>setCorrection({...correction,reason:value})}/>
+        </div>
+        <button className="primary-btn" disabled={busy||!activePoints.length||!correction.location_id||!correction.point_id||correction.reason.trim().length<10}>{busy?"Saving…":"Save audited correction"}</button>
+      </form>
+    </section>
+  </div>;
 }
 
 function Franchises({franchises,boundaries,setFranchises,refresh,notify}) {

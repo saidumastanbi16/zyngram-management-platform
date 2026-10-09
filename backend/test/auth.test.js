@@ -8,6 +8,7 @@ const test = require("node:test");
 const fixture = path.join(os.tmpdir(), `zyngram-auth-${crypto.randomUUID()}.json`);
 fs.writeFileSync(fixture, JSON.stringify({ Users: [], AuthAccounts: [], AuditLogs: [] }));
 process.env.ZYNGRAM_DATA_FILE = fixture;
+const store = require("../src/services/dataStore");
 const authService = require("../src/services/authService");
 const serviceCatalog = require("../src/services/serviceCatalog");
 const userService = require("../src/services/userService");
@@ -103,6 +104,22 @@ test("one-time admin password reset changes the hash and revokes existing sessio
     else process.env.ADMIN_PASSWORD = previousEnvironment.adminPassword;
     if (previousEnvironment.resetOnBoot === undefined) delete process.env.ADMIN_PASSWORD_RESET_ON_BOOT;
     else process.env.ADMIN_PASSWORD_RESET_ON_BOOT = previousEnvironment.resetOnBoot;
+  }
+});
+
+test("routine startup does not persist unchanged administrator state", () => {
+  authService.ensureStorage();
+  const originalWriteData = store.writeData;
+  let writeCount = 0;
+  store.writeData = data => {
+    writeCount += 1;
+    originalWriteData(data);
+  };
+  try {
+    authService.ensureStorage();
+    assert.equal(writeCount, 0);
+  } finally {
+    store.writeData = originalWriteData;
   }
 });
 

@@ -97,6 +97,10 @@ function ensureStorage() {
     }
   }
   const data = readData();
+  let changed = false;
+  if (!data.AuthAccounts) changed = true;
+  if (!data.AuthSessions) changed = true;
+  if (!data.AuditLogs) changed = true;
   data.AuthAccounts = data.AuthAccounts || [];
   data.AuthSessions = data.AuthSessions || [];
   data.AuditLogs = data.AuditLogs || [];
@@ -115,6 +119,7 @@ function ensureStorage() {
     data.AuthSessions = data.AuthSessions.filter(session => session.user_id !== adminAccount.user_id);
     audit(data, "SYSTEM", "AUTH_ADMIN_PASSWORD_RESET", "SUCCESS", { email: adminEmail });
     delete process.env.ADMIN_PASSWORD_RESET_ON_BOOT;
+    changed = true;
   } else if (!adminAccount) {
     const { salt, hash } = hashPassword(adminPassword);
     data.AuthAccounts.push({
@@ -128,9 +133,10 @@ function ensureStorage() {
       created_at: new Date().toISOString()
     });
     audit(data, "SYSTEM", "AUTH_ADMIN_BOOTSTRAPPED", "SUCCESS", { email: adminEmail });
+    changed = true;
   }
 
-  writeData(data);
+  if (changed) writeData(data);
 }
 
 function publicUser(account) {
