@@ -341,8 +341,8 @@ function Registration({ onBack, onCustomerLogin, onRegister }) {
 }
 
 function Login({ adminMode, onBack, onRegister, onLogin }) {
-  const [email, setEmail] = useState(adminMode ? "admin@zyngram.com" : "");
-  const [password, setPassword] = useState(adminMode ? "admin123" : "");
+  const [email, setEmail] = useState(adminMode && import.meta.env.DEV ? "admin@zyngram.com" : "");
+  const [password, setPassword] = useState(adminMode && import.meta.env.DEV ? "admin123" : "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const submit = async event => {

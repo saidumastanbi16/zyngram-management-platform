@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./EmployeeManagement.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5050";
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://127.0.0.1:5050" : "");
 const ownerPages = ["Overview", "All Employees", "Add Employee", "Departments", "Designations", "Attendance", "Leave", "Targets & KPIs", "Documents", "Reports"];
 const adminPages = ["Overview", "All Employees", "Franchise Employees", "Add Employee", "Departments", "Designations", "Work Locations", "Attendance", "Leave", "Targets & KPIs", "Documents", "Reports", "Audit Logs"];
 const employeePages = ["My Profile", "My Attendance", "My Leave", "My Targets", "My Documents", "My Performance", "My Notifications"];

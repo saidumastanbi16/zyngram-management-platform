@@ -5,6 +5,13 @@ const { getMongoProjections } = require("./mongoProjections");
 const schemaPath = process.env.ZYNGRAM_DATA_FILE || path.join(__dirname, "../../data/schema.json");
 const mongoEnabled = Boolean(process.env.MONGODB_URI && !process.env.ZYNGRAM_DATA_FILE);
 const maxMongoStateBytes = 15 * 1024 * 1024;
+const initialStateCollections = [
+  "Users", "AuthAccounts", "AuthSessions", "UserLocations", "Franchises", "GeoBoundaries",
+  "GeoMappingCorrections", "Orders", "OrderAttribution", "CommissionRules",
+  "CommissionLedger", "WalletLedger", "Employees", "Departments", "Designations",
+  "WorkLocations", "EmployeeFranchiseMapping", "Attendance", "LeaveRequests",
+  "Targets", "PerformanceRecords", "EmployeeDocuments", "Notifications", "AuditLogs", "Services"
+];
 let mongoClient = null;
 let mongoCollection = null;
 let dataCache = null;
@@ -16,6 +23,10 @@ let transactionsSupported = false;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function createEmptyInitialState() {
+  return Object.fromEntries(initialStateCollections.map(name => [name, []]));
 }
 
 function recordKey(name, record) {
@@ -217,10 +228,28 @@ async function initialize() {
     mongoCollection = database.collection("application_state");
     const storedState = await mongoCollection.findOne({ _id: "main" });
     if (!storedState || !storedState.data || typeof storedState.data !== "object") {
-      throw new Error("MongoDB has no imported Zyngram state; run `npm run migrate:mongodb` before starting the API");
+      if (process.env.MONGODB_BOOTSTRAP_EMPTY !== "true") {
+        throw new Error("MongoDB has no imported Zyngram state; run `npm run migrate:mongodb` before starting the API");
+      }
+      const existingCollections = await database.listCollections({}, { nameOnly: true }).toArray();
+      if (existingCollections.length) {
+        throw new Error("Refusing to bootstrap an empty Zyngram state because the MongoDB database already contains collections");
+      }
+      dataCache = createEmptyInitialState();
+      revision = 0;
+      persistedData = clone(dataCache);
+      await mongoCollection.insertOne({
+        _id: "main",
+        revision,
+        data: dataCache,
+        created_at: new Date()
+      });
+      console.log("Created empty Zyngram state in the empty MongoDB database.");
+    } else {
+      dataCache = storedState.data;
+      revision = Number(storedState.revision || 0);
+      persistedData = clone(dataCache);
     }
-    dataCache = storedState.data;
-    revision = Number(storedState.revision || 0);
     await createNormalizedCollections(dataCache);
     await syncNormalizedCollections(dataCache);
     persistedData = clone(dataCache);

@@ -1,6 +1,6 @@
 # Deployment guide and release gate
 
-This guide applies only to the `zyngram-day10` repository. The selected target is Render + MongoDB Atlas. A local MongoDB snapshot/mirror adapter is available, but it is single-instance, aggregate-state based and size-capped; production writes use multi-document transactions only on a replica set or sharded cluster. **Do not deploy this adapter as a production financial/recharge service**. Complete the database/session/object-storage blockers in `DAY12_PRODUCTION_READINESS.md` first.
+This guide applies only to the `zyngram-day10` repository. The selected target is Netlify for the frontend, Render for the API, and MongoDB Atlas for persistence. A local MongoDB snapshot/mirror adapter is available, but it is single-instance, aggregate-state based and size-capped; production writes use multi-document transactions only on a replica set or sharded cluster. **Do not deploy this adapter as a production financial/recharge service**. Complete the database/session/object-storage blockers in `DAY12_PRODUCTION_READINESS.md` first.
 
 ## Local build and smoke test
 
@@ -48,6 +48,18 @@ Copy `backend/.env.example` to an untracked local `.env`. For a production-like 
 
 Set `VITE_API_URL` from `frontend/.env.example` to the HTTPS API origin before creating a frontend build. Vite embeds this value into the static bundle, so rebuild when it changes. Keep real secrets out of source control and frontend environment variables.
 
+## Netlify frontend + Render API
+
+The Netlify project is connected to `saidumastanbi16/zyngram-management-platform`, auto-publishes `main`, and its production site is public at `https://zyngram-management-platform.netlify.app`. [`netlify.toml`](../netlify.toml) configures the frontend base directory, build command, and publish directory for Git builds.
+
+The Netlify production environment has `VITE_API_URL` set to `https://zyngram-management-platform.onrender.com`. The production build intentionally fails if this value is missing or malformed. This value is public frontend configuration; never put MongoDB credentials or administrator secrets in Netlify. Production admin sign-in fields are blank by default; local demo credentials are prefilled only in development mode.
+
+Render's public API origin is `https://zyngram-management-platform.onrender.com`; its currently inspected deployment fails during startup because the selected Atlas database has not yet been initialized. Render has masked `MONGODB_URI`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` variables configured. `CORS_ORIGINS` is set to the Netlify production origin.
+
+The current Atlas cluster is a new free `Cluster0`; its Data Explorer shows only the default/sample databases, not `zyngram_day10`. For first startup, Render's `MONGODB_BOOTSTRAP_EMPTY=true` enables creation of a blank app state only when `zyngram_day10` has no collections; startup refuses to initialize over existing collections. The administrator account is then created from the existing Render admin environment variables. This deliberately does not import the local JSON fixture and its demo/customer records. After deploying the bootstrap code, verify `GET /api/health` and `GET /api/ready`, then remove the one-time flag and rebuild/redeploy. If preserving local records is required, do not use empty bootstrap; run the validated import against a separate staging database after reviewing and approving the data.
+
+Once the backend reports ready, trigger a Netlify production deploy and verify registration, sign-in, and allowed API requests in the browser. The included app remains a demo and is not cleared for live financial/recharge traffic; follow the release gate below.
+
 The API limits login to 10 attempts per client IP per 15 minutes and registration to 10 attempts per client IP per hour. The limiter uses in-memory per-instance state, so keep the configured single backend instance or replace it with a shared store before scaling. Production trusts one reverse-proxy hop to obtain client IPs; review that setting if the hosting topology changes.
 
 ## Release checklist
@@ -64,7 +76,7 @@ The API limits login to 10 attempts per client IP per 15 minutes and registratio
 
 ## Render + MongoDB Atlas deployment gate
 
-[`render.yaml`](../render.yaml) declares a single-instance backend and static frontend. A live Render deployment has **not** been performed. The only supplied database URI is local and cannot be reached by Render. Do not deploy the snapshot/mirror store as a public production franchise/order/ledger system.
+[`render.yaml`](../render.yaml) declares a single-instance backend and static frontend. The Render service and Atlas cluster are provisioned, but the current API deploy exits at startup with “MongoDB has no imported Zyngram state.” The frontend is public; backend readiness and the end-to-end workflow are not yet verified. The local database URI cannot be reached by Render. Do not deploy the snapshot/mirror store as a public production franchise/order/ledger system.
 
 Before using the blueprint:
 
