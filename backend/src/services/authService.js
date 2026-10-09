@@ -103,9 +103,19 @@ function ensureStorage() {
 
   const adminEmail = (process.env.ADMIN_EMAIL || "admin@zyngram.com").trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-  const adminExists = data.AuthAccounts.some(account => account.email === adminEmail);
+  const adminAccount = data.AuthAccounts.find(account => account.email === adminEmail);
 
-  if (!adminExists) {
+  if (process.env.ADMIN_PASSWORD_RESET_ON_BOOT === "true") {
+    if (!adminAccount || adminAccount.role !== "ADMIN") {
+      throw new Error("ADMIN_PASSWORD_RESET_ON_BOOT requires an existing administrator account");
+    }
+    const { salt, hash } = hashPassword(adminPassword);
+    adminAccount.salt = salt;
+    adminAccount.password_hash = hash;
+    data.AuthSessions = data.AuthSessions.filter(session => session.user_id !== adminAccount.user_id);
+    audit(data, "SYSTEM", "AUTH_ADMIN_PASSWORD_RESET", "SUCCESS", { email: adminEmail });
+    delete process.env.ADMIN_PASSWORD_RESET_ON_BOOT;
+  } else if (!adminAccount) {
     const { salt, hash } = hashPassword(adminPassword);
     data.AuthAccounts.push({
       user_id: "ADMIN-001",

@@ -1,8 +1,17 @@
 # Zyngram Day 12 Production Readiness Report
 
 **Scope:** `zyngram-day10` repository only. No earlier Zyngram projects were imported.
-**Assessment:** Code review, backend regression suite, local MongoDB import, normalized-collection/index verification, and local API smoke checks. Target selected: MongoDB Atlas + Render. The supplied `mongodb://localhost:27017` is local to the developer machine and is not reachable from Render.
-**Decision:** **NO-GO for public production launch.** Mongo-backed local demonstration and migration are implemented. Atlas networking/credentials, a truly transactional/normalized application repository, private object storage, a real recharge provider, and hosting credentials/domain remain prerequisites.
+**Assessment:** Code review, backend regression suite, local MongoDB import, normalized-collection/index verification, local API smoke checks, and live Netlify/Render/Atlas connectivity checks. Target: MongoDB Atlas + Render. The supplied `mongodb://localhost:27017` is local to the developer machine and is not reachable from Render.
+**Decision:** **NO-GO for real public production traffic.** The Netlify frontend and Render API are deployed and the API is ready against Atlas. The live database is a blank demo state; local demo records were not imported. A truly normalized production repository, private object storage, a real recharge provider, and production operational controls remain prerequisites.
+
+## Live deployment verification
+
+- Frontend: `https://zyngram-management-platform.netlify.app` is public and serves the landing page.
+- API: `https://zyngram-management-platform.onrender.com/api/health` returned HTTP 200.
+- Database readiness: `/api/ready` returned HTTP 200 with `ready: true`, `storage: mongodb`, and `transactions: true`.
+- CORS: the health and readiness requests succeeded from the Netlify frontend origin.
+- Atlas: the guarded empty-state bootstrap initialized `zyngram_day10`; the one-time `MONGODB_BOOTSTRAP_EMPTY` flag was removed and Render redeployed successfully.
+- Admin sign-in and full registration/order workflows were not independently verified. No local JSON/demo records were imported.
 
 ## Local database and migration verification (2026-10-07)
 
@@ -28,7 +37,7 @@
 | Entity relationships, constraints, indexes, seed data | **Migration-validated; runtime constraints partial** | Import validates duplicate IDs, account/customer links (except the legacy system ADMIN account), user/location/order/service/attribution/franchise/commission-rule/employee references, unique commission order/owner/level entries, attendance keys and other supported constraints. Commission ledger `owner_id` is retained as a required historical recipient snapshot; it is not treated as a foreign key to the franchise's current owner because owner reassignment must not invalidate historical ledger entries. Customer and franchise-owner projections are derived from Users and franchise owner references, and do not duplicate credentials. Entity collections receive indexes for IDs, emails, hierarchy, orders, commission, wallet, attendance, employee, notification and audit lookups. Cross-entity constraints remain application-level and are only fully checked at import, not on every write. Three service catalogue records are seeded. |
 | Object storage | **Missing** | Employee documents are stored in JSON as base64. Move them to private object storage with expiring authorization before launch. |
 | Live external services | **Missing** | Mobile recharge is demo-only; production recharge, payment processing, telecom callbacks/reconciliation and real reverse geocoding require provider credentials and integration. |
-| Production deployment | **In progress; not production-ready** | Netlify, Render and a free Atlas cluster are provisioned. The public Netlify frontend is published; the Render API currently exits because its Atlas database has no imported Zyngram state. An empty-state bootstrap is guarded to refuse databases that already have collections. The app is not approved for public financial/recharge traffic; `/api/ready` does not certify production suitability. |
+| Production deployment | **Live demo; not production-ready** | Public Netlify frontend and Render API are deployed. `/api/health` and `/api/ready` return HTTP 200; readiness reports Atlas-backed MongoDB. The empty-state bootstrap was removed after successfully initializing a blank database. Admin sign-in and complete business workflows are not verified. The app is not approved for real financial/recharge traffic; `/api/ready` does not certify production suitability. |
 
 ## Security and test status
 
@@ -43,7 +52,7 @@ The backend now rejects wildcard/missing production CORS configuration and refus
 3. Configure account verification/recovery, session revocation/expiry policy and abuse controls.
 4. Move employee documents to private object storage and test authorization using production-like policies.
 5. Decide whether mobile recharge is a demo or a real product. Real service requires an approved operator/provider API, payment flow and callback/reconciliation handling.
-6. Provision Atlas and Render, set the Atlas URI using Render's secret environment-variable UI (never in chat or source control), configure domains, TLS, backups, monitoring and alerting; then run the deployment procedure in `DEPLOYMENT.md`.
+6. Harden the provisioned Atlas and Render services: review Atlas network access and least privilege, rotate secrets through the provider UIs, configure domains, backups, monitoring and alerting; then run the deployment procedure in `DEPLOYMENT.md`.
 7. Re-run all automated tests and execute the manual security scenarios in the deployment checklist against staging before production approval.
 
 ## Data entities verified in the current schema

@@ -54,11 +54,11 @@ The Netlify project is connected to `saidumastanbi16/zyngram-management-platform
 
 The Netlify production environment has `VITE_API_URL` set to `https://zyngram-management-platform.onrender.com`. The production build intentionally fails if this value is missing or malformed. This value is public frontend configuration; never put MongoDB credentials or administrator secrets in Netlify. Production admin sign-in fields are blank by default; local demo credentials are prefilled only in development mode.
 
-Render's public API origin is `https://zyngram-management-platform.onrender.com`; its currently inspected deployment fails during startup because the selected Atlas database has not yet been initialized. Render has masked `MONGODB_URI`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` variables configured. `CORS_ORIGINS` is set to the Netlify production origin.
+Render's public API origin is `https://zyngram-management-platform.onrender.com`. Its current deployment is live; `GET /api/health` returns HTTP 200 and `GET /api/ready` returns `ready: true` with `storage: mongodb`. Requests to both endpoints from the Netlify origin also succeed. Render has masked `MONGODB_URI`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` variables configured. `CORS_ORIGINS` is set to the Netlify production origin.
 
-The current Atlas cluster is a new free `Cluster0`; its Data Explorer shows only the default/sample databases, not `zyngram_day10`. For first startup, Render's `MONGODB_BOOTSTRAP_EMPTY=true` enables creation of a blank app state only when `zyngram_day10` has no collections; startup refuses to initialize over existing collections. The administrator account is then created from the existing Render admin environment variables. This deliberately does not import the local JSON fixture and its demo/customer records. After deploying the bootstrap code, verify `GET /api/health` and `GET /api/ready`, then remove the one-time flag and rebuild/redeploy. If preserving local records is required, do not use empty bootstrap; run the validated import against a separate staging database after reviewing and approving the data.
+The Atlas `Cluster0` database `zyngram_day10` was initially empty. The guarded `MONGODB_BOOTSTRAP_EMPTY=true` setting created a blank app state only because the database had no collections; it refused to initialize over existing collections. After readiness was verified, the one-time flag was removed and Render was redeployed successfully. The local JSON fixture and its demo/customer records were not imported. To recover a known administrator account, set a strong `ADMIN_PASSWORD` and `ADMIN_PASSWORD_RESET_ON_BOOT=true` in Render, deploy, verify the account, then remove the reset flag and redeploy. The reset flag only updates an existing ADMIN account matching `ADMIN_EMAIL`, revokes that account's sessions, writes an audit entry, and removes itself from the running process; it fails startup if no matching administrator exists. Do not leave the flag configured across restarts. Admin sign-in has not yet been independently verified.
 
-Once the backend reports ready, trigger a Netlify production deploy and verify registration, sign-in, and allowed API requests in the browser. The included app remains a demo and is not cleared for live financial/recharge traffic; follow the release gate below.
+The frontend is public at `https://zyngram-management-platform.netlify.app` and currently serves the landing page. Verify registration, sign-in, and allowed API requests before relying on those workflows. The included app remains a demo and is not cleared for live financial/recharge traffic; follow the release gate below.
 
 The API limits login to 10 attempts per client IP per 15 minutes and registration to 10 attempts per client IP per hour. The limiter uses in-memory per-instance state, so keep the configured single backend instance or replace it with a shared store before scaling. Production trusts one reverse-proxy hop to obtain client IPs; review that setting if the hosting topology changes.
 
@@ -74,16 +74,16 @@ The API limits login to 10 attempts per client IP per 15 minutes and registratio
 8. Confirm real recharge/payment provider readiness separately. The included Mobile Recharge flow is explicitly demo-only: its staff completion status is `DEMO_COMPLETED`, commissions are demo ledger entries, and no telecom recharge is submitted.
 9. Obtain an approval and rollback plan before production traffic.
 
-## Render + MongoDB Atlas deployment gate
+## Render + MongoDB Atlas deployment status
 
-[`render.yaml`](../render.yaml) declares a single-instance backend and static frontend. The Render service and Atlas cluster are provisioned, but the current API deploy exits at startup with “MongoDB has no imported Zyngram state.” The frontend is public; backend readiness and the end-to-end workflow are not yet verified. The local database URI cannot be reached by Render. Do not deploy the snapshot/mirror store as a public production franchise/order/ledger system.
+[`render.yaml`](../render.yaml) declares a single-instance backend and static frontend. The Netlify frontend and Render API are live, and the API is ready against Atlas. The public URLs are `https://zyngram-management-platform.netlify.app` and `https://zyngram-management-platform.onrender.com`. The live Atlas database was initialized as a blank app state; local demo data was not imported. This verifies hosting, database connectivity and cross-origin API access, **not** production suitability or complete customer/admin workflows. Do not use the snapshot/mirror store as a production franchise/order/ledger system.
 
-Before using the blueprint:
+Before accepting real production traffic:
 
-1. Complete the production blockers in [the readiness report](./DAY12_PRODUCTION_READINESS.md), especially transactional normalized storage and private object storage.
-2. Provision an Atlas cluster with least-privilege database credentials and network access rules. Migrate to a separate staging database and verify counts.
-3. Create the Render blueprint, then configure `MONGODB_URI`, `ADMIN_EMAIL`, and a strong `ADMIN_PASSWORD` in the Render secret UI. Never paste the URI into chat, commit it, expose it as `VITE_*`, or include it in logs.
-4. Set backend `CORS_ORIGINS` to the exact static-site HTTPS origin and frontend `VITE_API_URL` to the backend HTTPS origin; trigger a frontend rebuild.
+1. Complete the production blockers in [the readiness report](./DAY12_PRODUCTION_READINESS.md), especially normalized transactional storage and private object storage.
+2. Review Atlas network access and least-privilege database credentials; configure backups and rehearse restore on a separate staging database.
+3. Verify the Render `ADMIN_EMAIL` and strong `ADMIN_PASSWORD` through the secret UI and confirm administrator sign-in. Never paste secrets into chat, commit them, expose them as `VITE_*`, or include them in logs.
+4. Keep backend `CORS_ORIGINS` restricted to the exact static-site HTTPS origin and frontend `VITE_API_URL` pointed at the backend HTTPS origin.
 5. Run health/readiness, end-to-end, and security flows in staging. Promote only after approval and rollback/backup rehearsal.
 
-Public frontend/backend URLs cannot be supplied until Atlas/Render access is provisioned and the production release gate passes.
+The public demo is available at the URLs above; it is not approved for real financial/recharge traffic until the production release gate passes.

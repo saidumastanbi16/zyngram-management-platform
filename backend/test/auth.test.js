@@ -70,6 +70,42 @@ test("registration rejects duplicate email addresses regardless of casing", () =
   );
 });
 
+test("one-time admin password reset changes the hash and revokes existing sessions", () => {
+  const previousEnvironment = {
+    adminEmail: process.env.ADMIN_EMAIL,
+    adminPassword: process.env.ADMIN_PASSWORD,
+    resetOnBoot: process.env.ADMIN_PASSWORD_RESET_ON_BOOT
+  };
+  try {
+    process.env.ADMIN_EMAIL = "reset-admin@example.invalid";
+    process.env.ADMIN_PASSWORD = "previous-safe-password";
+    delete process.env.ADMIN_PASSWORD_RESET_ON_BOOT;
+    authService.ensureStorage();
+
+    const previousSession = authService.login(process.env.ADMIN_EMAIL, process.env.ADMIN_PASSWORD);
+    process.env.ADMIN_PASSWORD = "replacement-safe-password";
+    process.env.ADMIN_PASSWORD_RESET_ON_BOOT = "true";
+    authService.ensureStorage();
+
+    assert.equal(authService.getSession(previousSession.token), undefined);
+    assert.throws(
+      () => authService.login(process.env.ADMIN_EMAIL, "previous-safe-password"),
+      { message: "Invalid email or password" }
+    );
+    const currentSession = authService.login(process.env.ADMIN_EMAIL, "replacement-safe-password");
+    assert.equal(currentSession.user.role, "ADMIN");
+    assert.equal(process.env.ADMIN_PASSWORD_RESET_ON_BOOT, undefined);
+    authService.deleteSession(currentSession.token);
+  } finally {
+    if (previousEnvironment.adminEmail === undefined) delete process.env.ADMIN_EMAIL;
+    else process.env.ADMIN_EMAIL = previousEnvironment.adminEmail;
+    if (previousEnvironment.adminPassword === undefined) delete process.env.ADMIN_PASSWORD;
+    else process.env.ADMIN_PASSWORD = previousEnvironment.adminPassword;
+    if (previousEnvironment.resetOnBoot === undefined) delete process.env.ADMIN_PASSWORD_RESET_ON_BOOT;
+    else process.env.ADMIN_PASSWORD_RESET_ON_BOOT = previousEnvironment.resetOnBoot;
+  }
+});
+
 test("registration links an existing customer profile when its mobile also matches", () => {
   const data = JSON.parse(fs.readFileSync(fixture, "utf8"));
   data.Users.push({
